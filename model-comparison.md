@@ -1,17 +1,22 @@
-# So Sánh Chi Tiết Hai Mô Hình CycleGAN Night-to-Day
+# So Sánh Chi Tiết Hai Mô Hình CycleGAN cho Chuyển Đổi Ảnh Đêm sang Ban Ngày
 
-## Tổng Quan
+## Tóm Tắt
 
-Repository này chứa hai phương pháp khác nhau để chuyển đổi ảnh đêm sang ảnh ban ngày sử dụng kiến trúc CycleGAN:
+Bài viết này trình bày phân tích so sánh chi tiết hai phương pháp chuyển đổi ảnh đêm sang ảnh ban ngày dựa trên kiến trúc CycleGAN (Cycle-Consistent Generative Adversarial Networks). Hai phương pháp được nghiên cứu bao gồm:
 
-1. **CycleGAN với ResNet Generator** - Kiến trúc chuẩn với ResNet blocks
-2. **Multi-Scale CycleGAN** - Kiến trúc custom với multi-scale discriminator
+1. **CycleGAN với ResNet Generator** - Kiến trúc chuẩn sử dụng Residual blocks
+2. **Multi-Scale CycleGAN** - Kiến trúc tùy chỉnh với multi-scale discriminator
+
+Cả hai mô hình đều được huấn luyện và đánh giá trên tập dữ liệu BDD100K (Berkeley DeepDrive Dataset).
 
 ---
 
 ## 1. CycleGAN with ResNet Generator
 
-### 🏗️ Kiến Trúc Mô Hình
+### Kiến Trúc Mô Hình
+
+![ResNet CycleGAN Architecture](images/resnet-cyclegan-architecture.png)
+*Hình 1: Sơ đồ kiến trúc tổng thể của CycleGAN với ResNet Generator*
 
 #### Generator (ResNet-based U-Net)
 
@@ -48,10 +53,10 @@ Output (256×256×3) range: [-1, 1]
 ```
 
 **Đặc điểm nổi bật:**
-- ✅ **Reflection Padding**: Tránh artifacts ở biên ảnh
-- ✅ **Residual Blocks**: Giúp học identity mapping, training ổn định hơn
-- ✅ **GroupNormalization** (groups=-1): Tương đương Instance Normalization
-- ✅ **Skip connections**: Giữ thông tin chi tiết từ encoder
+- **Reflection Padding**: Giảm thiểu artifacts tại biên ảnh
+- **Residual Blocks**: Hỗ trợ học identity mapping và ổn định quá trình huấn luyện
+- **GroupNormalization** (groups=-1): Tương đương với Instance Normalization
+- **Skip connections**: Bảo toàn thông tin chi tiết từ encoder đến decoder
 
 #### Discriminator (PatchGAN)
 
@@ -79,8 +84,8 @@ Output: Patch-based classification
 ```
 
 **Đặc điểm:**
-- 🎯 **PatchGAN**: Đánh giá tính real/fake theo từng patch, không phải toàn bộ ảnh
-- 🎯 **LeakyReLU**: Tránh dead neurons
+- **PatchGAN**: Đánh giá tính real/fake theo từng patch thay vì toàn bộ ảnh
+- **LeakyReLU**: Ngăn ngừa hiện tượng dead neurons trong quá trình huấn luyện
 
 ### 🎓 Training Configuration
 
@@ -138,7 +143,10 @@ L_D = MSE(ones, D(real)) + MSE(zeros, D(fake))
 
 ## 2. Multi-Scale CycleGAN
 
-### 🏗️ Kiến Trúc Mô Hình
+### Kiến Trúc Mô Hình
+
+![Multi-Scale CycleGAN Architecture](images/multiscale-cyclegan-architecture.png)
+*Hình 2: Sơ đồ kiến trúc tổng thể của Multi-Scale CycleGAN*
 
 #### Generator (Custom U-Net with Inception Modules)
 
@@ -200,17 +208,17 @@ Sigmoid activation
 Output (256×256×3) range: [0, 1]
 ```
 
-**Đặc điểm nổi bật:**
-- ✅ **Inception Modules**: Multiple convolutions học features phong phú hơn
-- ✅ **Latent Bottleneck**: Dense layer 128 units với L2 regularization
-- ✅ **Multi-scale Fusion**: Kết hợp features từ decoder sâu (coarse) với decoder nông (fine)
-- ✅ **Large Kernel (5×5)**: Học quan hệ pixel với neighbors xa hơn
+**Đặc điểm nổi bất:**
+- **Inception Modules**: Sử dụng multiple convolutions để học các đặc trưng phong phú hơn
+- **Latent Bottleneck**: Dense layer với 128 units và L2 regularization
+- **Multi-scale Fusion**: Kết hợp đặc trưng từ các decoder layers ở độ sâu khác nhau
+- **Large Kernel (5×5)**: Mở rộng receptive field để học quan hệ không gian xa hơn
 
-#### Discriminator (Multi-Scale PatchGAN) ⭐
+#### Discriminator (Multi-Scale PatchGAN)
 
 **Đặc điểm độc đáo:**
-- 🌟 **3 outputs ở các scales khác nhau**
-- 🌟 Kernel size: `5×5` (lớn hơn chuẩn)
+- **3 outputs ở các scales khác nhau**: Cho phép đánh giá ở multiple resolutions
+- **Kernel size**: 5×5 (lớn hơn kernel chuẩn 3×3 hoặc 4×4)
 
 **Cấu trúc:**
 
@@ -235,12 +243,13 @@ Output 3: Conv2D(1, 5×5) → (32×32×1) ← Fine scale (objects gần)
 ```
 
 **Ý nghĩa Multi-Scale:**
-- 📍 **Scale 1 (8×8)**: Đánh giá tổng thể cảnh, objects xa camera
-- 📍 **Scale 2 (16×16)**: Đánh giá objects ở khoảng cách trung bình
-- 📍 **Scale 3 (32×32)**: Đánh giá chi tiết, objects gần camera
+- **Scale 1 (8×8)**: Đánh giá tổng thể cảnh quan và các đối tượng ở khoảng cách xa
+- **Scale 2 (16×16)**: Đánh giá các đối tượng ở khoảng cách trung bình
+- **Scale 3 (32×32)**: Đánh giá chi tiết các đối tượng ở khoảng cách gần
 
 **Lợi ích:**
-> "Discriminator phải nhận biết toàn bộ object, dù gần hay xa camera. Trong ảnh lái xe, objects có thể ở nhiều khoảng cách khác nhau. Multi-scale giúp đánh giá đúng ở mọi scale."
+
+Discriminator cần có khả năng nhận diện các đối tượng ở mọi khoảng cách trong ảnh. Trong ngữ cảnh lái xe tự động, các đối tượng xuất hiện ở nhiều khoảng cách khác nhau từ camera. Kiến trúc multi-scale cho phép discriminator đánh giá chất lượng ảnh sinh ra một cách hiệu quả ở tất cả các mức độ chi tiết.
 
 ### 🎓 Training Configuration
 
@@ -285,7 +294,7 @@ loss_weights = [
 | **Learning Rate (Generator)** | 5e-5 |
 | **Optimizer** | Adam |
 | **Weight Decay** | 6e-8 |
-| **Epochs** | 30,000 🔥 |
+| **Epochs** | 30,000 |
 | **Base Filters** | 16 |
 | **Kernel Size** | 5×5 |
 | **Dataset** | BDD100K |
@@ -300,7 +309,7 @@ loss_weights = [
 - Normalize: img/255 (range [0,1])
 ```
 
-#### Training với WandB 📊
+#### Training với Weights & Biases
 
 ```python
 wandb.init(
@@ -322,16 +331,19 @@ wandb.init(
 - Auto-backup checkpoints mỗi 2000 epochs
 ```
 
-**Features WandB:**
-- ✅ Real-time loss tracking
-- ✅ Auto-save checkpoints lên cloud
-- ✅ Visualize generated images
-- ✅ Resume training tự động khi Kaggle timeout
-- ✅ Compare multiple runs
+**Các tính năng của Weights & Biases:**
+- Real-time loss tracking
+- Tự động lưu checkpoints lên cloud
+- Trực quan hóa ảnh được sinh ra
+- Tự động khôi phục training khi Kaggle timeout
+- So sánh nhiều lần chạy thí nghiệm
 
 ---
 
-## 📊 So Sánh Chi Tiết
+## So Sánh Chi Tiết
+
+![Architecture Comparison](images/architecture-comparison.png)
+*Hình 3: So sánh trực quan giữa hai kiến trúc CycleGAN*
 
 ### Kiến Trúc
 
@@ -340,8 +352,8 @@ wandb.init(
 | **Generator Base** | ResNet blocks | Inception modules |
 | **Generator Filters** | 64 → 256 | 16 → 256 |
 | **Generator Kernel** | 3×3, 4×4, 7×7 | 5×5 (uniform) |
-| **Latent Space** | ❌ None | ✅ Dense(128) + L2 reg |
-| **Multi-scale Fusion** | ❌ None | ✅ Skip từ deep decoder |
+| **Latent Space** | Không có | Dense(128) + L2 reg |
+| **Multi-scale Fusion** | Không có | Skip từ deep decoder |
 | **Output Activation** | tanh [-1,1] | sigmoid [0,1] |
 | **Discriminator Type** | Single-scale PatchGAN | Multi-scale PatchGAN |
 | **Discriminator Outputs** | 1 | 3 (scales: 8×8, 16×16, 32×32) |
@@ -368,55 +380,56 @@ wandb.init(
 | **Adversarial** | MSE | MSE (×3 scales) |
 | **Cycle Consistency** | MAE × 10 | MAE × 10 |
 | **Identity** | MAE × 5 | MAE × 0.5 |
-| **Regularization** | ❌ None | ✅ L2 (0.001) in latent |
+| **Regularization** | Không có | L2 (0.001) trong latent space |
 | **Total Losses** | 4 | 10 (3 scales × 2 + cycle + identity) |
 
 ---
 
-## 🎯 Ưu Nhược Điểm
+## Ưu Nhược Điểm
 
 ### ResNet CycleGAN
 
 **Ưu điểm:**
-- ✅ **Proven architecture**: Kiến trúc đã được chứng minh hiệu quả
-- ✅ **Training nhanh**: Chỉ 100 epochs
-- ✅ **Ổn định**: Residual blocks giúp gradient flow tốt
-- ✅ **Reflection padding**: Không artifacts ở biên
-- ✅ **Dễ implement**: Code đơn giản, dễ hiểu
-- ✅ **Resource-friendly**: Batch size 1, ít RAM
+- **Kiến trúc đã được chứng minh**: Dựa trên các nghiên cứu đã công bố và kiểm chứng
+- **Thời gian huấn luyện ngắn**: Chỉ cần 100 epochs
+- **Ổn định**: Residual blocks hỗ trợ gradient flow hiệu quả
+- **Reflection padding**: Giảm thiểu artifacts tại biên ảnh
+- **Dễ triển khai**: Code đơn giản, dễ hiểu và bảo trì
+- **Tiết kiệm tài nguyên**: Batch size 1, yêu cầu RAM thấp
 
 **Nhược điểm:**
-- ❌ **Single-scale discriminator**: Không xử lý tốt objects ở nhiều khoảng cách
-- ❌ **Ít data augmentation**: Không diverse data
-- ❌ **No latent regularization**: Không force compact representation
-- ❌ **Short training**: 100 epochs có thể chưa đủ
+- **Single-scale discriminator**: Hạn chế trong xử lý đối tượng ở nhiều khoảng cách khác nhau
+- **Data augmentation hạn chế**: Độ đa dạng dữ liệu chưa cao
+- **Không có latent regularization**: Không ép buộc học compact representation
+- **Thời gian huấn luyện ngắn**: 100 epochs có thể chưa đủ để đạt convergence tối ưu
 
 ### Multi-Scale CycleGAN
 
 **Ưu điểm:**
-- ✅ **Multi-scale discriminator**: Xử lý objects gần/xa camera cực tốt
-- ✅ **Large kernel (5×5)**: Học quan hệ pixel-neighbor tốt hơn
-- ✅ **Latent bottleneck**: Force compact, meaningful representation
-- ✅ **Multi-scale fusion**: Kết hợp coarse + fine features
-- ✅ **WandB integration**: Track metrics, auto-resume, cloud backup
-- ✅ **Long training**: 30k epochs → better convergence
-- ✅ **Batch size 4**: Stable gradient estimates
+- **Multi-scale discriminator**: Xử lý hiệu quả các đối tượng ở mọi khoảng cách
+- **Large kernel (5×5)**: Mở rộng receptive field cho việc học quan hệ không gian
+- **Latent bottleneck**: Ép buộc học compact và meaningful representation
+- **Multi-scale fusion**: Kết hợp đặc trưng ở nhiều mức độ chi tiết
+- **Tích hợp WandB**: Theo dõi metrics, tự động khôi phục, sao lưu cloud
+- **Huấn luyện kéo dài**: 30,000 epochs đảm bảo convergence tốt hơn
+- **Batch size 4**: Ước lượng gradient ổn định hơn
 
 **Nhược điểm:**
-- ❌ **Training rất lâu**: 30,000 epochs
-- ❌ **Phức tạp**: Khó debug, nhiều hyperparameters
-- ❌ **Resource-intensive**: Cần GPU mạnh, thời gian lâu
-- ❌ **Overfitting risk**: Training quá lâu có thể overfit
-- ❌ **3 discriminator outputs**: Tính toán loss phức tạp hơn
+- **Thời gian huấn luyện dài**: Yêu cầu 30,000 epochs
+- **Phức tạp**: Khó debug và có nhiều hyperparameters cần điều chỉnh
+- **Yêu cầu tài nguyên cao**: Cần GPU mạnh và thời gian huấn luyện lâu
+- **Nguy cơ overfitting**: Training quá lâu có thể dẫn đến overfitting
+- **3 discriminator outputs**: Tính toán loss phức tạp hơn
 
 ---
 
-## 🔬 Thiết Kế Đặc Biệt cho Bài Toán Night-to-Day
+## Thiết Kế Đặc Biệt cho Bài Toán Night-to-Day
 
-### Multi-Scale Discriminator Philosophy
+### Triết Lý Multi-Scale Discriminator
 
 **Vấn đề:**
-> Trong ảnh lái xe ban đêm, một số vật thể có thể rất tối do thiếu ánh sáng. Chỉ một phần nhỏ của vật thể visible. Discriminator phải học được cách đánh giá liệu việc reconstruct vật thể ban ngày có đúng hay không.
+
+Trong ảnh lái xe ban đêm, một số đối tượng có thể rất tối do thiếu ánh sáng, chỉ một phần nhỏ của đối tượng có thể quan sát được. Discriminator cần học cách đánh giá chính xác việc tái tạo đối tượng ban ngày từ thông tin hạn chế này.
 
 **Giải pháp:**
 
@@ -450,69 +463,70 @@ x = Reshape(...)
 
 ---
 
-## 📈 Kết Quả Dự Kiến
+## Kết Quả Dự Kiến
 
 ### ResNet CycleGAN
-- ⚡ **Training time**: 2-4 giờ (với GPU)
-- 🎨 **Quality**: Good, đủ cho most cases
-- 📊 **Use case**: Prototyping, baseline, limited resources
+- **Thời gian huấn luyện**: 2-4 giờ (với GPU)
+- **Chất lượng**: Tốt, đáp ứng đủ cho hầu hết các trường hợp sử dụng
+- **Ứng dụng**: Prototyping, baseline, môi trường tài nguyên hạn chế
 
 ### Multi-Scale CycleGAN
-- 🕐 **Training time**: Vài ngày đến vài tuần
-- 🎨 **Quality**: Excellent, chi tiết objects gần/xa
-- 📊 **Use case**: Production, research, khi cần quality cao nhất
+- **Thời gian huấn luyện**: Vài ngày đến vài tuần
+- **Chất lượng**: Xuất sắc, chi tiết tốt cho đối tượng ở mọi khoảng cách
+- **Ứng dụng**: Production, nghiên cứu, khi yêu cầu chất lượng cao nhất
 
 ---
 
-## 💡 Recommendations
+## Khuyến Nghị Sử Dụng
 
-### Khi nào dùng ResNet CycleGAN?
-- ✅ Cần kết quả nhanh
-- ✅ Limited GPU resources
-- ✅ Baseline model
-- ✅ Ảnh không có quá nhiều objects ở different distances
+### Khi nào nên sử dụng ResNet CycleGAN?
+- Cần kết quả trong thời gian ngắn
+- Tài nguyên GPU hạn chế
+- Xây dựng baseline model
+- Ảnh không chứa quá nhiều đối tượng ở các khoảng cách khác nhau
 
-### Khi nào dùng Multi-Scale CycleGAN?
-- ✅ Cần quality cao nhất
-- ✅ Có GPU mạnh và thời gian
-- ✅ Ảnh có nhiều objects ở different scales (driving scenes)
-- ✅ Production deployment
-- ✅ Research purposes
+### Khi nào nên sử dụng Multi-Scale CycleGAN?
+- Yêu cầu chất lượng cao nhất
+- Có sẵn GPU mạnh và thời gian huấn luyện đủ dài
+- Ảnh chứa nhiều đối tượng ở các scales khác nhau (ví dụ: cảnh lái xe)
+- Triển khai production
+- Mục đích nghiên cứu khoa học
 
 ---
 
-## 🛠️ Technical Insights
+## Phân Tích Kỹ Thuật
 
 ### GroupNormalization vs BatchNormalization
 
-**Tại sao dùng GroupNorm?**
-- Batch size = 1 → BatchNorm không hoạt động tốt
-- GroupNorm (groups=-1) = Instance Normalization
-- Normalize từng channel độc lập
-- Không phụ thuộc batch size
+**Lý do sử dụng GroupNormalization:**
+- Với batch size = 1, BatchNormalization không hoạt động hiệu quả
+- GroupNorm với groups=-1 tương đương Instance Normalization
+- Normalize từng channel một cách độc lập
+- Không phụ thuộc vào batch size
 
 ### Reflection Padding vs Zero Padding
 
-**ResNet model dùng Reflection Padding:**
+**ResNet model sử dụng Reflection Padding:**
 ```
 Original: [1, 2, 3, 4, 5]
 Zero Pad: [0, 0, 1, 2, 3, 4, 5, 0, 0]
 Reflect:  [3, 2, 1, 2, 3, 4, 5, 4, 3]
 ```
-- ✅ Không tạo artifacts ở biên
-- ✅ Smooth transitions
+**Lợi ích:**
+- Không tạo artifacts tại biên ảnh
+- Đảm bảo transitions mượt mà
 
 ### PatchGAN vs PixelGAN
 
-**PatchGAN advantages:**
-- Đánh giá N×N patches thay vì whole image
-- Fewer parameters
-- Better for high-frequency details
-- Computational efficient
+**Ưu điểm của PatchGAN:**
+- Đánh giá N×N patches thay vì toàn bộ ảnh
+- Số lượng tham số ít hơn
+- Hiệu quả hơn cho các chi tiết tần số cao
+- Hiệu quả về mặt tính toán
 
 ---
 
-## 📚 Dataset: BDD100K
+## Tập Dữ Liệu: BDD100K
 
 **Berkeley DeepDrive Dataset:**
 - 100K diverse driving images
@@ -526,19 +540,9 @@ Reflect:  [3, 2, 1, 2, 3, 4, 5, 4, 3]
 
 ---
 
-## 🔮 Future Improvements
 
-### Có thể thử:
-1. **Attention Mechanisms**: Self-attention cho generator
-2. **Progressive Growing**: Train từ low → high resolution
-3. **StyleGAN features**: Style mixing, AdaIN
-4. **Perceptual Loss**: VGG-based thay vì MAE
-5. **Color Histogram Matching**: Post-processing
-6. **Temporal Consistency**: Nếu có video sequences
 
----
-
-## 📄 Tài Liệu Tham Khảo
+## Tài Liệu Tham Khảo
 
 - **CycleGAN Paper**: "Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks" (Zhu et al., 2017)
 - **ResNet Paper**: "Deep Residual Learning for Image Recognition" (He et al., 2016)
@@ -546,14 +550,3 @@ Reflect:  [3, 2, 1, 2, 3, 4, 5, 4, 3]
 - **BDD100K**: https://bdd-data.berkeley.edu/
 
 ---
-
-## 🎓 Credits
-
-- **Framework**: TensorFlow 2.x / Keras 3.x
-- **Dataset**: BDD100K (Berkeley DeepDrive)
-- **Experiment Tracking**: Weights & Biases
-- **Platform**: Kaggle
-
----
-
-*Tạo ngày: January 3, 2026*
